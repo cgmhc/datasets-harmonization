@@ -1,0 +1,40 @@
+  TITLE:      CGMHC Measurement Invariance Draft 1;
+  DATA:       FILE IS /Users/HenryLian/Desktop/harmonisation_binary.csv;
+  
+  VARIABLE:   NAMES ARE
+       id age cohort
+       mood anhe guil deat hope fati inso weig apat strs agit cogi
+       worr ganx irri panc impr hlth rest phob soma lone;
+       
+              USEVARIABLES ARE
+       cohort 
+       mood anhe guil deat hope fati inso weig apat strs agit cogi
+       worr ganx irri panc impr hlth rest phob soma lone;
+       
+              CATEGORICAL ARE
+       mood anhe guil deat hope fati inso weig apat strs agit cogi
+       worr ganx irri panc impr hlth rest phob soma lone;
+       
+              GROUPING IS cohort
+       (1=ELSAUK 2=ELSABRAZIL);
+       
+       	    MISSING ARE
+       ALL (999);
+
+  MODEL:      dep BY mood@1 anhe guil deat hope fati inso weig apat strs agit cogi; !@1 to fix factor loadings for consistent scale across groups
+              anx BY worr@1 ganx irri panc impr hlth rest phob soma lone;
+              
+  ANALYSIS:	  TYPE = GENERAL; !configural invariance 
+  		  ESTIMATOR = WLSMV; !for binary/categorical outcomes          
+
+  OUTPUT:     STDYX MODINDICES;
+  
+  !METRIC INVARIANCE (contrain factor loadings)
+  !MODEL:     dep BY mood* (1) anhe (2) guil (3) deat (4) hope (5) fati (6) inso (7) 
+  !         			 weig (8) apat (9) strs (10) agit (11) cogi (12);
+  !  		  anx BY worr* (13) ganx (14) irri (15) panc (16) impr (17) hlth (18) 
+  !        			 rest (19) phob (20) soma (21) lone (22);
+  
+  !SCALAR INVARIANCE (constrain item thresholds [intercepts] across groups)
+  !mood (1); anhe (2); guil (3); deat (4); hope (5); fati (6); inso (7); weig (8); apat (9); strs (10); agit (11); cogi (12);  
+  !worr (13); ganx (14); irri (15); panc (16); impr (17); hlth (18); rest (19); phob (20); soma (21); lone (22);
