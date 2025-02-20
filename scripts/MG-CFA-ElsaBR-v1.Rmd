@@ -1,0 +1,347 @@
+---
+title: "Harmonization pilot - Invariance testing for depression and anxiety measures in ELSA Brazil - v1"
+author: "Pedro Zuccolo, Daniel Fatori, James Lian"
+date: "2025-02-18"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+knitr::opts_knit$set(root.dir = '/Users/pedrozuccolo/Desktop/harmonization/data')
+output_dir <- "/outputs"
+```
+
+# Packages
+```{r, echo=TRUE, results="hide", warning=FALSE, message=FALSE}
+#MG-CFA - ELSA Brasil
+library(lavaan)
+library(foreign)
+library(haven)
+library(tidyverse)
+library(lavaanPlot)
+library(effectsize)
+library(semTools)
+library(semPlot)
+```
+
+# Depression model 
+## Prepare dataset
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+#load
+elsabr <- read.csv("elsabr_covid.csv") %>%
+  select(-X)
+
+dass_items <- elsabr %>%
+  #keep depression items for all wave
+  select(IDELSA, SEXO, matches("dass13_rec_c*|dass16_rec_c*|dass17_rec_c*|dass21_rec_c*|dass5_rec_c*"))
+
+# definition of items names 
+#"mood", "anhe", "guil", "deat", "hope", "fati", "inso", "weig", "apat", "strs", "agit", "cogi","worr", "ganx", "irri", "panc", "impr", "hlth","rest", "phob", "soma", "lone"
+
+#rename dass items
+dass <- dass_items %>%
+    rename(mood1 = dass13_rec_c1,
+           anhe1 = dass16_rec_c1,
+           guil1 = dass17_rec_c1,
+           hope1 = dass21_rec_c1,
+           apat1 = dass5_rec_c1,
+           mood2 = dass13_rec_c2,
+           anhe2 = dass16_rec_c2,
+           guil2 = dass17_rec_c2,
+           hope2 = dass21_rec_c2,
+           apat2 = dass5_rec_c2,
+           mood3 = dass13_rec_c3,
+           anhe3 = dass16_rec_c3,
+           guil3 = dass17_rec_c3,
+           hope3 = dass21_rec_c3,
+           apat3 = dass5_rec_c3, 
+           mood4 = dass13_rec_c4,
+           anhe4 = dass16_rec_c4,
+           guil4 = dass17_rec_c4,
+           hope4 = dass21_rec_c4,
+           apat4 = dass5_rec_c4) 
+          
+# pivot longer
+dass_long <- dass %>%
+  pivot_longer(
+    cols = matches("^(apat|mood|anhe|guil|hope)[0-9]+$"),
+    names_to = c(".value", "Wave"),  
+    names_pattern = "([a-z]+)([0-9]+)" 
+  ) %>%
+  #make wave integer
+  mutate(Wave = as.integer(Wave)) %>% # 
+  #make dass items binary (simple rule: if dass => 2,then 1, else 0)
+  mutate(across(4:last_col(), ~ ifelse(. > 2, 1, 0)))
+
+#convert symptom items to factor
+dass.factor <- dass_long %>% mutate(across(4:ncol(dass_long), as.factor))
+
+# Define the list of categorical (ordered) variables
+ordered_vars <- c("mood", "anhe", "guil", "hope", "apat")
+
+# Convert them to ordered factors
+dass.factor[ordered_vars] <- lapply(dass.factor[ordered_vars], ordered)
+
+str(dass.factor)
+```
+
+## check dataset
+```{r}
+#check if binarization worked
+table(dass.factor$mood)
+table(dass.factor$anhe)
+table(dass.factor$guil)
+table(dass.factor$hope)
+table(dass.factor$apat) 
+```
+
+## Define model
+```{r}
+# Specify the measurement model
+general_model <- '
+  # Depression latent variable
+  dep =~ mood + anhe + guil + hope + fati + inso + weig + apat + stre + agit + cogn + inde
+  
+  # Anxiety latent variable
+  anx =~ worr + ganx + irri + pani + func + hlth + rest + phob + soma + situ + over + brkd + lone
+'
+
+  # Depression latent variable (using Match 1 in symptom item selection spreadsheet: https://docs.google.com/spreadsheets/d/1BjcU4lfUimc4uWSWn4AtmOmctjiTenlI/edit?gid=1202869578#gid=1202869578)
+
+dep_model <- 'dep =~ mood + anhe + guil + hope + apat'
+```
+
+## Fit model
+### Configural invariance
+```{r}
+### ------------------------------
+### 1. Configural Invariance Model
+### ------------------------------
+# No equality constraints: the factor structure is the same across groups,
+# but loadings and thresholds are freely estimated.
+fit_configural <- cfa(dep_model, 
+                      data = dass.factor, 
+                      group = "Wave", #e.g. 1 is elsa-brasil and 2 is elsa-uk
+                      ordered = ordered_vars, 
+                      estimator = "WLSMV")
+
+# Display summary for the configural model
+summary(fit_configural, standardized = TRUE, modindices = TRUE)
+```
+
+### Metric invariance
+```{r}
+### ------------------------------
+### 2. Metric Invariance Model
+### ------------------------------
+# Constrain factor loadings to be equal across groups.
+fit_metric <- cfa(dep_model, 
+                  data = dass.factor, 
+                  group = "Wave", 
+                  ordered = ordered_vars, 
+                  estimator = "WLSMV",
+                  group.equal = "loadings")
+
+# Display summary for the metric invariance model
+summary(fit_metric, standardized = TRUE, modindices = TRUE)
+```
+
+### Scalar invariance
+```{r}
+### ------------------------------
+### 3. Scalar Invariance Model
+### ------------------------------
+# Constrain both factor loadings and thresholds to be equal across groups.
+fit_scalar <- cfa(dep_model, 
+                  data = dass.factor, 
+                  group = "Wave", 
+                  ordered = ordered_vars, 
+                  estimator = "WLSMV",
+                  group.equal = c("loadings", "thresholds"))
+
+# Display summary for the scalar invariance model
+summary(fit_scalar, standardized = TRUE, modindices = TRUE)
+```
+
+## Fit indices evaluation
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+### Configural model
+```{r}
+fitMeasures(fit_configural, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+### Metric model
+```{r}
+fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+### Scalar model
+```{r}
+fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+# Anxiety model
+## Prepare dataset
+```{r}
+dass_items <- elsabr %>%
+  #keep depression items for all wave
+  select(IDELSA, SEXO, matches("dass1_rec_c*|dass9_rec_c*|dass14_rec_c*|dass20_rec_c*"))
+
+# definition of items names 
+#"mood", "anhe", "guil", "deat", "hope", "fati", "inso", "weig", "apat", "strs", "agit", "cogi","worr", "ganx", "irri", "panc", "impr", "hlth","rest", "phob", "soma", "lone"
+
+#rename dass items
+dass <- dass_items %>%
+    rename(worr1 = dass9_rec_c1,
+           ganx1 = dass20_rec_c1,
+           irri1 = dass14_rec_c1,
+           rest1 = dass1_rec_c1,
+           worr2 = dass9_rec_c2,
+           ganx2 = dass20_rec_c2,
+           irri2 = dass14_rec_c2,
+           rest2 = dass1_rec_c2,
+           worr3 = dass9_rec_c3,
+           ganx3 = dass20_rec_c3,
+           irri3 = dass14_rec_c3,
+           rest3 = dass1_rec_c3,
+           worr4 = dass9_rec_c4,
+           ganx4 = dass20_rec_c4,
+           irri4 = dass14_rec_c4,
+           rest4 = dass1_rec_c4
+           ) 
+          
+# pivot longer
+dass_long <- dass %>%
+  pivot_longer(
+    cols = matches("^(worr|ganx|irri|rest)[0-9]+$"),
+    names_to = c(".value", "Wave"),  
+    names_pattern = "([a-z]+)([0-9]+)" 
+  ) %>%
+  #make wave integer
+  mutate(Wave = as.integer(Wave)) %>% # 
+  #make dass items binary (simple rule: if dass => 2,then 1, else 0)
+  mutate(across(4:last_col(), ~ ifelse(. > 2, 1, 0)))
+
+#convert symptom items to factor
+dass.factor <- dass_long %>% mutate(across(4:ncol(dass_long), as.factor))
+
+# Define the list of categorical (ordered) variables
+ordered_vars <- c("worr", "ganx", "irri", "rest")
+
+# Convert them to ordered factors
+dass.factor[ordered_vars] <- lapply(dass.factor[ordered_vars], ordered)
+
+str(dass.factor)
+```
+
+## check dataset
+```{r}
+#check if binarization worked
+table(dass.factor$worr)
+table(dass.factor$ganx)
+table(dass.factor$irri)
+table(dass.factor$rest)
+```
+
+## Define model 
+```{r}
+# Specify the measurement model
+general_model <- '
+  # Depression latent variable
+  dep =~ mood + anhe + guil + hope + fati + inso + weig + apat + stre + agit + cogn + inde
+  
+  # Anxiety latent variable
+  anx =~ worr + ganx + irri + pani + func + hlth + rest + phob + soma + situ + over + brkd + lone
+'
+
+  # Depression latent variable (using Match 1 in symptom item selection spreadsheet: https://docs.google.com/spreadsheets/d/1BjcU4lfUimc4uWSWn4AtmOmctjiTenlI/edit?gid=1202869578#gid=1202869578)
+
+anx_model <- 'dep =~ worr + ganx + irri + rest'
+```
+
+## Fit model
+### Configural invariance
+```{r}
+### ------------------------------
+### 1. Configural Invariance Model
+### ------------------------------
+# No equality constraints: the factor structure is the same across groups,
+# but loadings and thresholds are freely estimated.
+fit_configural <- cfa(anx_model, 
+                      data = dass.factor, 
+                      group = "Wave", #e.g. 1 is elsa-brasil and 2 is elsa-uk
+                      ordered = ordered_vars, 
+                      estimator = "WLSMV")
+
+# Display summary for the configural model
+summary(fit_configural, standardized = TRUE, modindices = TRUE)
+```
+
+### Metric invariance
+```{r}
+### ------------------------------
+### 2. Metric Invariance Model
+### ------------------------------
+# Constrain factor loadings to be equal across groups.
+fit_metric <- cfa(anx_model, 
+                  data = dass.factor, 
+                  group = "Wave", 
+                  ordered = ordered_vars, 
+                  estimator = "WLSMV",
+                  group.equal = "loadings")
+
+# Display summary for the metric invariance model
+summary(fit_metric, standardized = TRUE, modindices = TRUE)
+```
+
+### Scalar invariance
+```{r}
+### ------------------------------
+### 3. Scalar Invariance Model
+### ------------------------------
+# Constrain both factor loadings and thresholds to be equal across groups.
+fit_scalar <- cfa(anx_model, 
+                  data = dass.factor, 
+                  group = "Wave", 
+                  ordered = ordered_vars, 
+                  estimator = "WLSMV",
+                  group.equal = c("loadings", "thresholds"))
+
+# Display summary for the scalar invariance model
+summary(fit_scalar, standardized = TRUE, modindices = TRUE)
+```
+
+## Fit indices evaluation
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+### Configural model
+```{r}
+fitMeasures(fit_configural, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+### Metric model
+```{r}
+fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+### Scalar model
+```{r}
+#fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
+# not extracted because model did not run
+```
+
+
+
+
+

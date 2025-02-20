@@ -1,0 +1,652 @@
+---
+title: "Harmonization pilot - Invariance testing for depression and anxiety measures in ELSA Brazil - v2"
+author: "Pedro Zuccolo, Daniel Fatori, James Lian"
+date: "2025-02-18"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+knitr::opts_knit$set(root.dir = '/Users/pedrozuccolo/Desktop/harmonization/data')
+output_dir <- "/outputs"
+```
+
+# Packages
+```{r, echo=TRUE, results="hide", warning=FALSE, message=FALSE}
+#MG-CFA - ELSA Brasil
+library(lavaan)
+library(foreign)
+library(haven)
+library(tidyverse)
+library(lavaanPlot)
+library(effectsize)
+library(semTools)
+library(semPlot)
+```
+
+# Depression model 
+## Prepare dataset
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+#load
+elsabr <- read.csv("elsabr_covid.csv") %>%
+  select(-X)
+
+dass_items <- elsabr %>%
+  #keep depression items for all wave
+  select(IDELSA, SEXO, matches("dass13_rec_c*|dass16_rec_c*|dass17_rec_c*|dass21_rec_c*|dass5_rec_c*"))
+
+# definition of items names 
+#"mood", "anhe", "guil", "deat", "hope", "fati", "inso", "weig", "apat", "strs", "agit", "cogi","worr", "ganx", "irri", "panc", "impr", "hlth","rest", "phob", "soma", "lone"
+
+#rename dass items
+dass <- dass_items %>%
+    rename(mood1 = dass13_rec_c1,
+           anhe1 = dass16_rec_c1,
+           guil1 = dass17_rec_c1,
+           hope1 = dass21_rec_c1,
+           apat1 = dass5_rec_c1,
+           mood2 = dass13_rec_c2,
+           anhe2 = dass16_rec_c2,
+           guil2 = dass17_rec_c2,
+           hope2 = dass21_rec_c2,
+           apat2 = dass5_rec_c2,
+           mood3 = dass13_rec_c3,
+           anhe3 = dass16_rec_c3,
+           guil3 = dass17_rec_c3,
+           hope3 = dass21_rec_c3,
+           apat3 = dass5_rec_c3, 
+           mood4 = dass13_rec_c4,
+           anhe4 = dass16_rec_c4,
+           guil4 = dass17_rec_c4,
+           hope4 = dass21_rec_c4,
+           apat4 = dass5_rec_c4) %>%
+  #make dass items binary (simple rule: if dass => 2,then 1, else 0)
+  mutate(across(3:last_col(), ~ ifelse(. > 2, 1, 0)))
+
+# Define the list of categorical (ordered) variables
+ordered_vars <- c("mood1", "anhe1", "guil1", "hope1", "apat1", "mood2", "anhe2", "guil2", "hope2", "apat2", "mood3", "anhe3", "guil3", "hope3", "apat3", "mood4", "anhe4", "guil4", "hope4", "apat4")
+
+# Convert them to ordered factors
+dass[ordered_vars] <- lapply(dass[ordered_vars], ordered)
+```
+
+## check dataset
+```{r}
+#check if binarization worked
+table(dass$mood1)
+table(dass$anhe1)
+table(dass$guil1)
+table(dass$hope1)
+table(dass$apat1)
+table(dass$mood2)
+table(dass$anhe2)
+table(dass$guil2)
+table(dass$hope2)
+table(dass$apat2)
+table(dass$mood3)
+table(dass$anhe3)
+table(dass$guil3)
+table(dass$hope3)
+table(dass$apat3)
+table(dass$mood4)
+table(dass$anhe4)
+table(dass$guil4)
+table(dass$hope4)
+table(dass$apat4)
+```
+
+## Define general model
+```{r}
+# Specify the measurement model - simple model
+general_model <- '
+  # Depression latent variable
+  dep =~ mood + anhe + guil + hope + fati + inso + weig + apat + stre + agit + cogn + inde
+  
+  # Anxiety latent variable
+  anx =~ worr + ganx + irri + pani + func + hlth + rest + phob + soma + situ + over + brkd + lone
+'
+  # Depression latent variable (using Match 1 in symptom item selection spreadsheet: https://docs.google.com/spreadsheets/d/1BjcU4lfUimc4uWSWn4AtmOmctjiTenlI/edit?gid=1202869578#gid=1202869578). This means we are using: mood, anhe, guil, hope, apat
+```
+
+## Configural (baseline) invariance
+```{r}
+### ------------------------------
+### 1. Configural Invariance Model
+### ------------------------------
+# No equality constraints: the factor structure is the same across groups,
+# but loadings and thresholds are freely estimated.
+
+## Define configural model
+
+dep_config_model <- '
+  # latent factors by time
+  dep1 =~ mood1 + anhe1 + guil1 + hope1 + apat1
+  dep2 =~ mood2 + anhe2 + guil2 + hope2 + apat2
+  dep3 =~ mood3 + anhe3 + guil3 + hope3 + apat3
+  dep4 =~ mood4 + anhe4 + guil4 + hope4 + apat4
+
+  # Allow covariance between latent factors throughtout time 
+  dep1 ~~ dep2 + dep3 + dep4
+  dep2 ~~ dep3 + dep4
+  dep3 ~~ dep4
+
+  # Allow covariance between errors of the same variables throughout time
+  mood1 ~~ mood2 + mood3 + mood4
+  anhe1 ~~ anhe2 + anhe3 + anhe4
+  guil1 ~~ guil2 + guil3 + guil4
+  hope1 ~~ hope2 + hope3 + hope4
+  apat1 ~~ apat2 + apat3 + apat4
+'
+
+# Fit
+fit_configural <- cfa(dep_config_model, data = dass, 
+                         ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                                     "mood2", "anhe2", "guil2", "hope2", "apat2",
+                                     "mood3", "anhe3", "guil3", "hope3", "apat3",
+                                     "mood4", "anhe4", "guil4", "hope4", "apat4"),
+                         parameterization = "theta", estimator = "wlsmv",
+                         missing = "pairwise")
+```
+
+### Results
+```{r}
+summary(fit_configural, fit.measures = TRUE, standardized = TRUE)
+```
+
+### Visualization
+```{r}
+semPaths(fit_configural, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+```
+
+### Model indices
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+```{r}
+fitMeasures(fit_configural, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+## Metric invariance
+```{r}
+### ------------------------------
+### 2. Metric Invariance Model
+### ------------------------------
+# Constrain factor loadings to be equal across groups.
+
+#define metric model
+dep_metric_model <- '
+  # Constraints factorial loadings to be equal across time points
+dep1 =~ V1Loading*mood1 + V2Loading*anhe1 + V3Loading*guil1 + V4Loading*hope1 + V5Loading*apat1
+
+dep2 =~ V1Loading*mood2 + V2Loading*anhe2 + V3Loading*guil2 + V4Loading*hope2 + V5Loading*apat2
+
+dep3 =~ V1Loading*mood3 + V2Loading*anhe3 + V3Loading*guil3 + V4Loading*hope3 + V5Loading*apat3
+
+dep4 =~ V1Loading*mood4 + V2Loading*anhe4 + V3Loading*guil4 + V4Loading*hope4 + V5Loading*apat4
+
+
+  # Allow covariance between latent factors throughtout time 
+  dep1 ~~ dep2 + dep3 + dep4
+  dep2 ~~ dep3 + dep4
+  dep3 ~~ dep4
+
+  # Allow covariance between errors of the same variables throughout time
+  mood1 ~~ mood2 + mood3 + mood4
+  anhe1 ~~ anhe2 + anhe3 + anhe4
+  guil1 ~~ guil2 + guil3 + guil4
+  hope1 ~~ hope2 + hope3 + hope4
+  apat1 ~~ apat2 + apat3 + apat4
+'
+#Fit metric model
+fit_metric <- cfa(dep_metric_model, data = dass,
+                      ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                                     "mood2", "anhe2", "guil2", "hope2", "apat2",
+                                     "mood3", "anhe3", "guil3", "hope3", "apat3",
+                                     "mood4", "anhe4", "guil4", "hope4", "apat4"), 
+                      parameterization = "theta", estimator = "wlsmv",
+                      missing = "pairwise")
+```
+
+### Results
+```{r}
+summary(fit_metric, fit.measures = TRUE, standardized = TRUE)
+```
+
+### Visualization
+```{r}
+semPaths(fit_metric, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+```
+
+### Model indices
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+```{r}
+fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+
+## Scalar invariance
+```{r}
+### ------------------------------
+### 3. Scalar Invariance Model
+### ------------------------------
+# Constrain both factor loadings and thresholds to be equal across groups.
+
+#define scalar model
+dep_scalar_model <- '
+dep1 =~ V1Loading*mood1 + V2Loading*anhe1 + V3Loading*guil1 + V4Loading*hope1 + V5Loading*apat1
+
+dep2 =~ V1Loading*mood2 + V2Loading*anhe2 + V3Loading*guil2 + V4Loading*hope2 + V5Loading*apat2
+
+dep3 =~ V1Loading*mood3 + V2Loading*anhe3 + V3Loading*guil3 + V4Loading*hope3 + V5Loading*apat3
+
+dep4 =~ V1Loading*mood4 + V2Loading*anhe4 + V3Loading*guil4 + V4Loading*hope4 + V5Loading*apat4
+
+
+  # Allow covariance between latent factors throughtout time 
+  dep1 ~~ dep2 + dep3 + dep4
+  dep2 ~~ dep3 + dep4
+  dep3 ~~ dep4
+
+  # Allow covariance between errors of the same variables throughout time
+  mood1 ~~ mood2 + mood3 + mood4
+  anhe1 ~~ anhe2 + anhe3 + anhe4
+  guil1 ~~ guil2 + guil3 + guil4
+  hope1 ~~ hope2 + hope3 + hope4
+  apat1 ~~ apat2 + apat3 + apat4
+
+ # Constraints intercepts to be equal across time points
+  mood1 ~ c(i1)*1
+  mood2 ~ c(i1)*1
+  mood3 ~ c(i1)*1
+  mood4 ~ c(i1)*1
+
+  anhe1 ~ c(i2)*1
+  anhe2 ~ c(i2)*1
+  anhe3 ~ c(i2)*1
+  anhe4 ~ c(i2)*1
+
+  guil1 ~ c(i3)*1
+  guil2 ~ c(i3)*1
+  guil3 ~ c(i3)*1
+  guil4 ~ c(i3)*1
+
+  hope1 ~ c(i4)*1
+  hope2 ~ c(i4)*1
+  hope3 ~ c(i4)*1
+  hope4 ~ c(i4)*1
+
+  apat1 ~ c(i5)*1
+  apat2 ~ c(i5)*1
+  apat3 ~ c(i5)*1
+  apat4 ~ c(i5)*1
+'
+
+fit_scalar <- cfa(dep_scalar_model, data = dass,
+                  ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                              "mood2", "anhe2", "guil2", "hope2", "apat2",
+                              "mood3", "anhe3", "guil3", "hope3", "apat3",
+                              "mood4", "anhe4", "guil4", "hope4", "apat4"), 
+                  parameterization = "theta", estimator = "wlsmv",
+                  missing = "pairwise")
+```
+
+### Results
+```{r}
+summary(fit_scalar, fit.measures = TRUE, standardized = TRUE)
+```
+
+### Visualization
+```{r}
+semPaths(fit_scalar, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+```
+
+### Model indices
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+```{r}
+fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+
+# Anxiety model
+## Prepare dataset
+```{r}
+dass_items <- elsabr %>%
+  #keep depression items for all wave
+  select(IDELSA, SEXO, matches("dass1_rec_c*|dass9_rec_c*|dass14_rec_c*|dass20_rec_c*"))
+
+# definition of items names 
+#"mood", "anhe", "guil", "deat", "hope", "fati", "inso", "weig", "apat", "strs", "agit", "cogi","worr", "ganx", "irri", "panc", "impr", "hlth","rest", "phob", "soma", "lone"
+
+#rename dass items
+dass <- dass_items %>%
+    rename(worr1 = dass9_rec_c1,
+           ganx1 = dass20_rec_c1,
+           irri1 = dass14_rec_c1,
+           rest1 = dass1_rec_c1,
+           worr2 = dass9_rec_c2,
+           ganx2 = dass20_rec_c2,
+           irri2 = dass14_rec_c2,
+           rest2 = dass1_rec_c2,
+           worr3 = dass9_rec_c3,
+           ganx3 = dass20_rec_c3,
+           irri3 = dass14_rec_c3,
+           rest3 = dass1_rec_c3,
+           worr4 = dass9_rec_c4,
+           ganx4 = dass20_rec_c4,
+           irri4 = dass14_rec_c4,
+           rest4 = dass1_rec_c4
+           ) %>% # 
+  #make dass items binary (simple rule: if dass => 2,then 1, else 0)
+  mutate(across(3:last_col(), ~ ifelse(. > 2, 1, 0)))
+
+# Define the list of categorical (ordered) variables
+ordered_vars <- c("worr1", "ganx1", "irri1", "rest1", "worr2", "ganx2", "irri2", "rest2", "worr3", "ganx3", "irri3", "rest3", "worr4", "ganx4", "irri4", "rest4")
+
+# Convert them to ordered factors
+dass[ordered_vars] <- lapply(dass[ordered_vars], ordered)
+
+str(dass)
+```
+
+## check dataset
+```{r}
+#check if binarization worked
+table(dass$worr1)
+table(dass$ganx1)
+table(dass$irri1)
+table(dass$rest1)
+table(dass$worr2)
+table(dass$ganx2)
+table(dass$irri2)
+table(dass$rest2)
+table(dass$worr3)
+table(dass$ganx3)
+table(dass$irri3)
+table(dass$rest3)
+table(dass$worr4)
+table(dass$ganx4)
+table(dass$irri4)
+table(dass$rest4)
+```
+
+## Define general model 
+```{r}
+# Specify the measurement model
+general_model <- '
+  # Depression latent variable
+  dep =~ mood + anhe + guil + hope + fati + inso + weig + apat + stre + agit + cogn + inde
+  
+  # Anxiety latent variable
+  anx =~ worr + ganx + irri + pani + func + hlth + rest + phob + soma + situ + over + brkd + lone
+'
+
+  # Anxiety latent variable (using Match 1 in symptom item selection spreadsheet: https://docs.google.com/spreadsheets/d/1BjcU4lfUimc4uWSWn4AtmOmctjiTenlI/edit?gid=1202869578#gid=1202869578). This means we are using: worr, ganx, irri, rest
+
+anx_model <- 'dep =~ worr + ganx + irri + rest'
+```
+
+## Configural invariance
+```{r}
+### ------------------------------
+### 1. Configural Invariance Model
+### ------------------------------
+# No equality constraints: the factor structure is the same across groups,
+# but loadings and thresholds are freely estimated.
+
+#define model
+dep_configural_model <- ' 
+  # Configural model: No constraints on loadings
+  anx1 =~ worr1 + ganx1 + irri1 + rest1
+  anx2 =~ worr2 + ganx2 + irri2 + rest2
+  anx3 =~ worr3 + ganx3 + irri3 + rest3
+  anx4 =~ worr4 + ganx4 + irri4 + rest4
+
+  # Allow covariance between latent factors throughout time 
+  anx1 ~~ anx2 + anx3 + anx4
+  anx2 ~~ anx3 + anx4
+  anx3 ~~ anx4
+
+  # Allow covariance between errors of the same variables throughout time
+  worr1 ~~ worr2 + worr3 + worr4
+  ganx1 ~~ ganx2 + ganx3 + ganx4
+  irri1 ~~ irri2 + irri3 + irri4
+  rest1 ~~ rest2 + rest3 + rest4
+'
+
+fit_configural <- cfa(dep_configural_model, data = dass,
+                      ordered = c("worr1", "ganx1", "irri1", "rest1",
+                                  "worr2", "ganx2", "irri2", "rest2",
+                                  "worr3", "ganx3", "irri3", "rest3",
+                                  "worr4", "ganx4", "irri4", "rest4"), 
+                      parameterization = "theta", estimator = "wlsmv",
+                      missing = "pairwise")
+```
+
+### Results
+```{r}```
+summary(fit_configural, fit.measures = TRUE, standardized = TRUE)
+```
+
+### Visualization
+```{r}
+semPaths(fit_configural, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+```
+
+### Model indices
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+```{r}
+fitMeasures(fit_configural, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+
+## Metric invariance
+```{r}
+### ------------------------------
+### 2. Metric Invariance Model
+### ------------------------------
+# Constrain factor loadings to be equal across groups.
+
+
+#define model
+dep_metric_model <- ' 
+  anx1 =~ W1Loading*worr1 + W2Loading*ganx1 + W3Loading*irri1 + W4Loading*rest1
+  anx2 =~ W1Loading*worr2 + W2Loading*ganx2 + W3Loading*irri2 + W4Loading*rest2
+  anx3 =~ W1Loading*worr3 + W2Loading*ganx3 + W3Loading*irri3 + W4Loading*rest3
+  anx4 =~ W1Loading*worr4 + W2Loading*ganx4 + W3Loading*irri4 + W4Loading*rest4
+
+  # Allow covariance between latent factors throughout time 
+  anx1 ~~ anx2 + anx3 + anx4
+  anx2 ~~ anx3 + anx4
+  anx3 ~~ anx4
+
+  # Allow covariance between errors of the same variables throughout time
+  worr1 ~~ worr2 + worr3 + worr4
+  ganx1 ~~ ganx2 + ganx3 + ganx4
+  irri1 ~~ irri2 + irri3 + irri4
+  rest1 ~~ rest2 + rest3 + rest4
+'
+
+fit_metric <- cfa(dep_metric_model, data = dass,
+                  ordered = c("worr1", "ganx1", "irri1", "rest1",
+                              "worr2", "ganx2", "irri2", "rest2",
+                              "worr3", "ganx3", "irri3", "rest3",
+                              "worr4", "ganx4", "irri4", "rest4"), 
+                  parameterization = "theta", estimator = "wlsmv",
+                  missing = "pairwise")
+```
+
+### Results
+```{r}
+summary(fit_metric, fit.measures = TRUE, standardized = TRUE)
+```
+
+### Visualization
+```{r}
+semPaths(fit_metric, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+```
+
+### Model indices
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+```{r}
+fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
+```
+
+
+## Scalar invariance
+```{r}
+### ------------------------------
+### 3. Scalar Invariance Model
+### ------------------------------
+# Constrain both factor loadings and thresholds to be equal across groups.
+
+#define model
+library(lavaan)
+
+dep_scalar_model <- ' 
+  anx1 =~ W1Loading*worr1 + W2Loading*ganx1 + W3Loading*irri1 + W4Loading*rest1
+  anx2 =~ W1Loading*worr2 + W2Loading*ganx2 + W3Loading*irri2 + W4Loading*rest2
+  anx3 =~ W1Loading*worr3 + W2Loading*ganx3 + W3Loading*irri3 + W4Loading*rest3
+  anx4 =~ W1Loading*worr4 + W2Loading*ganx4 + W3Loading*irri4 + W4Loading*rest4
+
+  # Allow covariance between latent factors throughout time 
+  anx1 ~~ anx2 + anx3 + anx4
+  anx2 ~~ anx3 + anx4
+  anx3 ~~ anx4
+
+  # Allow covariance between errors of the same variables throughout time
+  worr1 ~~ worr2 + worr3 + worr4
+  ganx1 ~~ ganx2 + ganx3 + ganx4
+  irri1 ~~ irri2 + irri3 + irri4
+  rest1 ~~ rest2 + rest3 + rest4
+
+  # Constraints intercepts to be equal across time points
+  worr1 ~ c(i1)*1
+  worr2 ~ c(i1)*1
+  worr3 ~ c(i1)*1
+  worr4 ~ c(i1)*1
+
+  ganx1 ~ c(i2)*1
+  ganx2 ~ c(i2)*1
+  ganx3 ~ c(i2)*1
+  ganx4 ~ c(i2)*1
+
+  irri1 ~ c(i3)*1
+  irri2 ~ c(i3)*1
+  irri3 ~ c(i3)*1
+  irri4 ~ c(i3)*1
+
+  rest1 ~ c(i4)*1
+  rest2 ~ c(i4)*1
+  rest3 ~ c(i4)*1
+  rest4 ~ c(i4)*1
+'
+# fit model
+fit_scalar <- cfa(dep_scalar_model, data = dass,
+                  ordered = c("worr1", "ganx1", "irri1", "rest1",
+                              "worr2", "ganx2", "irri2", "rest2",
+                              "worr3", "ganx3", "irri3", "rest3",
+                              "worr4", "ganx4", "irri4", "rest4"), 
+                  parameterization = "theta", estimator = "wlsmv",
+                  missing = "pairwise")
+```
+
+### Results
+```{r}
+summary(fit_scalar, fit.measures = TRUE, standardized = TRUE)
+```
+
+### Visualization
+```{r}
+semPaths(fit_scalar, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+```
+
+### Model indices
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally .06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
+
+```{r}
+fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
+```
