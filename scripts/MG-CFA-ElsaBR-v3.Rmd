@@ -26,6 +26,8 @@ library(lavaanPlot)
 library(effectsize)
 library(semTools)
 library(semPlot)
+library(mice)
+library(VIM)
 ```
 
 # Depression model 
@@ -72,6 +74,13 @@ ordered_vars <- c("mood1", "anhe1", "guil1", "hope1", "apat1", "mood2", "anhe2",
 
 # Convert them to ordered factors
 dass[ordered_vars] <- lapply(dass[ordered_vars], ordered)
+
+#imputation
+dass_imputed <- mice(dass, m=5, maxit=50, meth='pmm', seed=500)
+summary(dass_imputed)
+dass_complete <- complete(dass_imputed, 1)
+
+
 ```
 
 ## check dataset
@@ -111,6 +120,9 @@ general_model <- '
 '
   # Depression latent variable (using Match 1 in symptom item selection spreadsheet: https://docs.google.com/spreadsheets/d/1BjcU4lfUimc4uWSWn4AtmOmctjiTenlI/edit?gid=1202869578#gid=1202869578). This means we are using: mood, anhe, guil, hope, apat
 ```
+
+
+
 
 ## Configural (baseline) invariance
 ```{r}
@@ -276,6 +288,8 @@ fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
 ### ------------------------------
 # Constrain both factor loadings and thresholds to be equal across groups.
 
+str(dass_complete)
+
 #define scalar model
 dep_scalar_model <- '
 # Constraints factorial loadings to be equal across time points
@@ -299,41 +313,53 @@ guil1 ~~ guil2 + guil3 + guil4
 hope1 ~~ hope2 + hope3 + hope4
 apat1 ~~ apat2 + apat3 + apat4
 
+
 # Constrain thresholds to be equal across time points
-mood1 | t1
-mood2 | t1
-mood3 | t1
-mood4 | t1
+mood1 | t1*t1 + t2*t2 + t3*t3
+mood2 | t1*t1 + t2*t2 + t3*t3
+mood3 | t1*t1 + t2*t2 + t3*t3
+mood4 | t1*t1 + t2*t2 + t3*t3
 
-anhe1 | t2
-anhe2 | t2
-anhe3 | t2
-anhe4 | t2
+anhe1 | t4*t4 + t5*t5 + t6*t6
+anhe2 | t4*t4 + t5*t5 + t6*t6
+anhe3 | t4*t4 + t5*t5 + t6*t6
+anhe4 | t4*t4 + t5*t5 + t6*t6
 
-guil1 | t3
-guil2 | t3
-guil3 | t3
-guil4 | t3
+guil1 | t7*t7 + t8*t8 + t9*t9
+guil2 | t7*t7 + t8*t8 + t9*t9
+guil3 | t7*t7 + t8*t8 + t9*t9
+guil4 | t7*t7 + t8*t8 + t9*t9
 
-hope1 | t4
-hope2 | t4
-hope3 | t4
-hope4 | t4
+hope1 | t10*t10 + t11*t11 + t12*t12
+hope2 | t10*t10 + t11*t11 + t12*t12
+hope3 | t10*t10 + t11*t11 + t12*t12
+hope4 | t10*t10 + t11*t11 + t12*t12
 
-apat1 | t5
-apat2 | t5
-apat3 | t5
-apat4 | t5
+apat1 | t13*t13 + t14*t14 + t15*t15
+apat2 | t13*t13 + t14*t14 + t15*t15
+apat3 | t13*t13 + t14*t14 + t15*t15
+apat4 | t13*t13 + t14*t14 + t15*t15
 '
 
 # Fit
-fit_metric <- cfa(dep_scalar_model, data = dass,
+fit_scalar <- cfa(dep_scalar_model, data = dass_complete,
                       ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
                                      "mood2", "anhe2", "guil2", "hope2", "apat2",
                                      "mood3", "anhe3", "guil3", "hope3", "apat3",
                                      "mood4", "anhe4", "guil4", "hope4", "apat4"), 
                       parameterization = "theta", estimator = "wlsmv",
                       missing = "pairwise")
+```
+
+```{r}
+
+str(dass)
+colSums(is.na(dass))
+dass %>% summarise(across(c(mood1, anhe1, guil1, hope1, apat1, 
+                             mood2, anhe2, guil2, hope2, apat2, 
+                             mood3, anhe3, guil3, hope3, apat3, 
+                             mood4, anhe4, guil4, hope4, apat4), 
+                           ~ sum(!is.na(.))))
 
 ```
 
@@ -674,3 +700,37 @@ fit_scalar <- cfa(dep_scalar_model, data = dass,
 ##not shown because did not converge
 #fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
 ```
+
+#######james troubleshooting attempt 1#######
+
+#ensure correct number of thresholds
+thresholds <- sapply(dass_complete[, c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                                       "mood2", "anhe2", "guil2", "hope2", "apat2",
+                                       "mood3", "anhe3", "guil3", "hope3", "apat3",
+                                       "mood4", "anhe4", "guil4", "hope4", "apat4")], 
+                     function(x) length(unique(x)))
+print(thresholds)
+
+# define a simpler model to start with
+simple_model <- '
+dep1 =~ mood1 + anhe1 + guil1 + hope1 + apat1
+dep2 =~ mood2 + anhe2 + guil2 + hope2 + apat2
+dep3 =~ mood3 + anhe3 + guil3 + hope3 + apat3
+dep4 =~ mood4 + anhe4 + guil4 + hope4 + apat4
+'
+
+# fit the simpler model
+fit_simple <- cfa(simple_model, data = dass_complete,
+                  ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                              "mood2", "anhe2", "guil2", "hope2", "apat2",
+                              "mood3", "anhe3", "guil3", "hope3", "apat3",
+                              "mood4", "anhe4", "guil4", "hope4", "apat4"), 
+                  parameterization = "theta", estimator = "wlsmv",
+                  missing = "pairwise")
+
+# check convergence of the simpler model
+if (!lavInspect(fit_simple, "converged")) {
+  warning("Simple model did not converge. Consider checking data or further simplifying the model.")
+} else {
+  summary(fit_simple, fit.measures = TRUE, standardized = TRUE)
+}
