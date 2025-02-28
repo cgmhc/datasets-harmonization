@@ -1,0 +1,111 @@
+---
+title: "Harmonization pilot - Cohorts profile"
+author: "Pedro Zuccolo, Daniel Fatori, James Lian"
+date: "2025-02-18"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+knitr::opts_knit$set(root.dir = '/Users/pedrozuccolo/Desktop/harmonization/data')
+output_dir <- "/outputs"
+```
+
+# Packages
+```{r, echo=TRUE, results="hide", warning=FALSE, message=FALSE}
+#MG-CFA - ELSA Brasil
+library(tidyverse)
+library(lubridate)
+library(ggsci)
+```
+
+# Elsa Brazil Cohort
+## Prepare dataset
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+#load
+elsabr <- read.csv("/Users/pedrozuccolo/Desktop/harmonization/data/elsabr_covid.csv") %>%
+  select(-X)
+
+
+evaluation_dates <- elsabr %>%
+  # select variables
+  select(IDELSA, matches("data")) %>%
+  # long format
+  pivot_longer(cols = matches("data"), 
+                names_to = "wave",
+                values_to = "date") %>%
+  # format date
+  mutate(date = mdy(date)) %>%
+  #create month-year variable
+  mutate(month = month(date),
+        year = year(date),
+        day = "01",
+        month_year = if_else(is.na(date), NA, paste(day, month, year, sep = "-"))) %>%
+  mutate(month_year = dmy(month_year)) %>%
+  select(-month, -year, -day) %>%
+  # remove missing value
+  drop_na(month_year)
+
+#create dataset with all possible dates from Jan 2020 - December 2021)
+all_dates <- tibble(month_year = seq(ymd("2020-01-01"), ymd("2021-12-30"), by = "days"))
+
+# Merge all_dates with evaluation_dates
+merged_data <- merge(evaluation_dates, all_dates, by = "month_year", all = TRUE)
+
+# Create assessment variable
+plot_data <- merged_data %>%
+  mutate(depression = if_else(is.na(IDELSA), 0, 1),
+  anxiety = if_else(is.na(IDELSA), 0, 1)) %>%
+  select(month_year, anxiety, depression, wave) %>%
+  filter(depression ==1) %>%
+  pivot_longer(
+    cols = c("anxiety", "depression"),
+    names_to = "assessment_type",
+    values_to = "assessment"
+  )
+
+
+str(plot_data)
+```
+
+
+
+## Visualize dates of assessment
+```{r}
+# Create the plot
+
+ggplot(plot_data, aes(x = month_year, y = assessment_type, fill = assessment_type)) +
+  geom_tile(aes(width = 10, height = 0.05), position = position_jitter(width = 0.8, height = 0.3), color = "grey", alpha = 0.8) +  
+  scale_y_discrete(labels = NULL) + 
+  scale_fill_manual(values = c("#fdd780", "#478ea6")) +  # Cores distintas para os grupos
+  scale_x_date(
+    limits = c(as.Date("2020-01-01"), as.Date("2021-10-01")),
+    breaks = seq(as.Date("2020-01-01"), as.Date("2021-10-01"), by = "1 month"),
+    date_labels = "%b %Y"  # Formato correto do rótulo do eixo X
+  ) + 
+  labs(title = "Timeline", x = "Date", y = "Assessment", fill = "Assessment Type") +
+  theme_minimal() +
+  theme(
+    panel.grid = element_line(color = "darkgrey", size = 0.1, linetype = 3),
+    axis.line = element_line(color = "darkgrey", size = 0.3, linetype = 1),
+    axis.text.x = element_text(angle = 45, vjust = 0.5, size = 8),  # Correção no tamanho do texto
+    axis.text.y = element_text(size = 12),  
+    axis.title.x = element_text(size = 12),  
+    axis.title.y = element_text(size = 12),  
+    legend.title = element_text(size = 12),  
+    legend.text = element_text(size = 12),  
+    plot.title = element_text(size = 14, hjust = 0.6)  
+  ) +
+  geom_vline(xintercept = as.Date("2020-03-01"), linetype = "dashed", size = 0.5, color = "black")
+
+ggsave("/Users/pedrozuccolo/Desktop/harmonization/outputs/elsa_timeline.png", width = 10, height = 5, dpi = 300, bg = "white")
+
+
+```
+
+
+
