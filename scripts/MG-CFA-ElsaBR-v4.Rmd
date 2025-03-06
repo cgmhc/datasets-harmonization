@@ -67,18 +67,13 @@ dass <- dass_items %>%
            hope4 = dass21_rec_c4,
            apat4 = dass5_rec_c4) %>%
   #make dass items binary (simple rule: if dass => 2,then 1, else 0)
-  mutate(across(3:last_col(), ~ ifelse(. > 2, 1, 0)))
+  mutate(across(3:last_col(), ~ ifelse(. >= 2, 1, 0)))
 
 # Define the list of categorical (ordered) variables
 ordered_vars <- c("mood1", "anhe1", "guil1", "hope1", "apat1", "mood2", "anhe2", "guil2", "hope2", "apat2", "mood3", "anhe3", "guil3", "hope3", "apat3", "mood4", "anhe4", "guil4", "hope4", "apat4")
 
 # Convert them to ordered factors
 dass[ordered_vars] <- lapply(dass[ordered_vars], ordered)
-
-#imputation
-dass_imputed <- mice(dass, m=5, maxit=50, meth='pmm', seed=500)
-summary(dass_imputed)
-dass_complete <- complete(dass_imputed, 1)
 ```
 
 ## check dataset
@@ -184,17 +179,18 @@ summary(fit_configural, fit.measures = TRUE, standardized = TRUE)
 ```
 
 ### Visualization
-```{r}
+```{r, echo=FALSE}
+#add title to semPaths
 semPaths(fit_configural, 
-         what = "std", 
-         whatLabels = "est", 
-         layout = "tree2", 
-         rotation = 1, 
-         edge.label.cex = 0.45, 
-         nCharNodes = 10, 
-         sizeMan = 3.2,         # size of manifest variables
-         label.cex = 1.2,     # font size in manifest variables
-         edge.color = "black" # lines color
+  what = "std", 
+  whatLabels = "est", 
+  layout = "tree2", 
+  rotation = 1, 
+  edge.label.cex = 0.45, 
+  nCharNodes = 10, 
+  sizeMan = 3.2,        
+  label.cex = 1.2,     
+  edge.color = "black"
 )
 ```
 
@@ -255,7 +251,7 @@ summary(fit_metric, fit.measures = TRUE, standardized = TRUE)
 ```
 
 ### Visualization
-```{r}
+```{r, echo=FALSE}
 semPaths(fit_metric, 
          what = "std", 
          whatLabels = "est", 
@@ -285,10 +281,8 @@ fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
 ### 3. Scalar Invariance Model
 ### ------------------------------
 # Constrain both factor loadings and thresholds to be equal across groups.
-
-str(dass_complete)
-
 #define scalar model
+
 dep_scalar_model <- '
 # Constraints factorial loadings to be equal across time points
 dep1 =~ V1Loading*mood1 + V2Loading*anhe1 + V3Loading*guil1 + V4Loading*hope1 + V5Loading*apat1
@@ -313,30 +307,30 @@ apat1 ~~ apat2 + apat3 + apat4
 
 
 # Constrain thresholds to be equal across time points
-mood1 | t1
-mood2 | t1
-mood3 | t1
-mood4 | t1
+mood1 | t_mood*t1
+mood2 | t_mood*t1
+mood3 | t_mood*t1
+mood4 | t_mood*t1
 
-anhe1 | t2
-anhe2 | t2
-anhe3 | t2
-anhe4 | t2
+anhe1 | t_anhe*t1
+anhe2 | t_anhe*t1
+anhe3 | t_anhe*t1
+anhe4 | t_anhe*t1
 
-guil1 | t3
-guil2 | t3
-guil3 | t3
-guil4 | t3
+guil1 | t_guil*t1
+guil2 | t_guil*t1
+guil3 | t_guil*t1
+guil4 | t_guil*t1
 
-hope1 | t4
-hope2 | t4
-hope3 | t4
-hope4 | t4
+hope1 | t_hope*t1
+hope2 | t_hope*t1
+hope3 | t_hope*t1
+hope4 | t_hope*t1
 
-apat1 | t5
-apat2 | t5
-apat3 | t5
-apat4 | t5
+apat1 | t_apat*t1
+apat2 | t_apat*t1
+apat3 | t_apat*t1
+apat4 | t_apat*t1
 '
 
 # Fit
@@ -354,24 +348,22 @@ fit_scalar <- cfa(dep_scalar_model, data = dass,
 
 ### Results
 ```{r}
-#not shown because did not converge
-#summary(fit_scalar, fit.measures = TRUE, standardized = TRUE)
+summary(fit_scalar, fit.measures = TRUE, standardized = TRUE)
 ```
 
 ### Visualization
-```{r}
-#not shown because did not converge
-#semPaths(fit_scalar, 
-#         what = "std", 
-#         whatLabels = "est", 
-#         layout = "tree2", 
-#         rotation = 1, 
-#         edge.label.cex = 0.45, 
-#         nCharNodes = 10, 
-#         sizeMan = 3.2,         # size of manifest variables
-#         label.cex = 1.2,     # font size in manifest variables
-#         edge.color = "black" # lines color
-#)
+```{r, echo=FALSE}
+semPaths(fit_scalar, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
 ```
 
 ### Model indices
@@ -381,8 +373,7 @@ fit_scalar <- cfa(dep_scalar_model, data = dass,
 * Chi-square p>.05 (doesn't matter if large sample size)
 
 ```{r}
-#not shown because did not converge
-#fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
+fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
 ```
 
 
@@ -423,8 +414,6 @@ ordered_vars <- c("worr1", "ganx1", "irri1", "rest1", "worr2", "ganx2", "irri2",
 
 # Convert them to ordered factors
 dass[ordered_vars] <- lapply(dass[ordered_vars], ordered)
-
-str(dass)
 ```
 
 ## check dataset
@@ -473,7 +462,7 @@ anx_model <- 'dep =~ worr + ganx + irri + rest'
 # but loadings and thresholds are freely estimated.
 
 #define model
-dep_configural_model <- ' 
+anx_configural_model <- ' 
   # Configural model: No constraints on loadings
   anx1 =~ 1*worr1 + ganx1 + irri1 + rest1
   anx2 =~ 1*worr2 + ganx2 + irri2 + rest2
@@ -492,7 +481,7 @@ dep_configural_model <- '
   rest1 ~~ rest2 + rest3 + rest4
 '
 
-fit_configural <- cfa(dep_configural_model, data = dass,
+fit_configural <- cfa(anx_configural_model, data = dass,
                       ordered = c("worr1", "ganx1", "irri1", "rest1",
                                   "worr2", "ganx2", "irri2", "rest2",
                                   "worr3", "ganx3", "irri3", "rest3",
@@ -502,12 +491,12 @@ fit_configural <- cfa(dep_configural_model, data = dass,
 ```
 
 ### Results
-```{r}```
+```{r}
 summary(fit_configural, fit.measures = TRUE, standardized = TRUE)
 ```
 
 ### Visualization
-```{r}
+```{r, echo=FALSE}
 semPaths(fit_configural, 
          what = "std", 
          whatLabels = "est", 
@@ -541,7 +530,7 @@ fitMeasures(fit_configural, c("cfi", "tli", "rmsea", "srmr"))
 
 
 #define model
-dep_metric_model <- ' 
+anx_metric_model <- ' 
   anx1 =~ 1*W1Loading*worr1 + W2Loading*ganx1 + W3Loading*irri1 + W4Loading*rest1
   anx2 =~ 1*W1Loading*worr2 + W2Loading*ganx2 + W3Loading*irri2 + W4Loading*rest2
   anx3 =~ 1*W1Loading*worr3 + W2Loading*ganx3 + W3Loading*irri3 + W4Loading*rest3
@@ -559,7 +548,7 @@ dep_metric_model <- '
   rest1 ~~ rest2 + rest3 + rest4
 '
 
-fit_metric <- cfa(dep_metric_model, data = dass,
+fit_metric <- cfa(anx_metric_model, data = dass,
                   ordered = c("worr1", "ganx1", "irri1", "rest1",
                               "worr2", "ganx2", "irri2", "rest2",
                               "worr3", "ganx3", "irri3", "rest3",
@@ -574,7 +563,7 @@ summary(fit_metric, fit.measures = TRUE, standardized = TRUE)
 ```
 
 ### Visualization
-```{r}
+```{r, echo=FALSE}
 semPaths(fit_metric, 
          what = "std", 
          whatLabels = "est", 
@@ -609,7 +598,7 @@ fitMeasures(fit_metric, c("cfi", "tli", "rmsea", "srmr"))
 #define model
 library(lavaan)
 
-dep_scalar_model <- ' 
+anx_scalar_model <- ' 
   anx1 =~ W1Loading*worr1 + W2Loading*ganx1 + W3Loading*irri1 + W4Loading*rest1
   anx2 =~ W1Loading*worr2 + W2Loading*ganx2 + W3Loading*irri2 + W4Loading*rest2
   anx3 =~ W1Loading*worr3 + W2Loading*ganx3 + W3Loading*irri3 + W4Loading*rest3
@@ -627,28 +616,28 @@ dep_scalar_model <- '
   rest1 ~~ rest2 + rest3 + rest4
 
   # Constraints intercepts to be equal across time points
-  worr1 | t1
-  worr2 | t1
-  worr3 | t1
-  worr4 | t1
+  worr1 | t_worr*t1
+  worr2 | t_worr*t1
+  worr3 | t_worr*t1
+  worr4 | t_worr*t1
 
-  ganx1 | t2
-  ganx2 | t2
-  ganx3 | t2
-  ganx4 | t2
+  ganx1 | t_ganx*t1
+  ganx2 | t_ganx*t1
+  ganx3 | t_ganx*t1
+  ganx4 | t_ganx*t1
 
-  irri1 | t3
-  irri2 | t3
-  irri3 | t3
-  irri4 | t3
+  irri1 | t_irri*t1
+  irri2 | t_irri*t1
+  irri3 | t_irri*t1
+  irri4 | t_irri*t1
 
-  rest1 | t4
-  rest2 | t4
-  rest3 | t4
-  rest4 | t4
+  rest1 | t_rest*t1
+  rest2 | t_rest*t1
+  rest3 | t_rest*t1
+  rest4 | t_rest*t1
 '
 # fit model
-fit_scalar <- cfa(dep_scalar_model, data = dass,
+fit_scalar <- cfa(anx_scalar_model, data = dass,
                   ordered = c("worr1", "ganx1", "irri1", "rest1",
                               "worr2", "ganx2", "irri2", "rest2",
                               "worr3", "ganx3", "irri3", "rest3",
@@ -659,24 +648,24 @@ fit_scalar <- cfa(dep_scalar_model, data = dass,
 
 ### Results
 ```{r}
-# not shown because did not converge
-#summary(fit_scalar, fit.measures = TRUE, standardized = TRUE)
+summary(fit_scalar, fit.measures = TRUE, standardized = TRUE)
 ```
 
 ### Visualization
-```{r}
-#not shown because did not converge
-#semPaths(fit_scalar, 
-#         what = "std", 
-#         whatLabels = "est", 
-#         layout = "tree2", 
-#         rotation = 1, 
-#         edge.label.cex = 0.45, 
-#         nCharNodes = 10, 
-#         sizeMan = 3.2,         # size of manifest variables
-#         label.cex = 1.2,     # font size in manifest variables
-#         edge.color = "black" # lines color
-#)
+```{r, echo=FALSE}
+#pdf("anx_scalar_model.pdf", width = 10, height = 7)
+semPaths(fit_scalar, 
+         what = "std", 
+         whatLabels = "est", 
+         layout = "tree2", 
+         rotation = 1, 
+         edge.label.cex = 0.45, 
+         nCharNodes = 10, 
+         sizeMan = 3.2,         # size of manifest variables
+         label.cex = 1.2,     # font size in manifest variables
+         edge.color = "black" # lines color
+)
+#dev.off()
 ```
 
 ### Model indices
@@ -686,40 +675,6 @@ fit_scalar <- cfa(dep_scalar_model, data = dass,
 * Chi-square p>.05 (doesn't matter if large sample size)
 
 ```{r}
-##not shown because did not converge
-#fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
+fitMeasures(fit_scalar, c("cfi", "tli", "rmsea", "srmr"))
 ```
 
-#######james troubleshooting attempt 1#######
-
-#ensure correct number of thresholds
-thresholds <- sapply(dass_complete[, c("mood1", "anhe1", "guil1", "hope1", "apat1",
-                                       "mood2", "anhe2", "guil2", "hope2", "apat2",
-                                       "mood3", "anhe3", "guil3", "hope3", "apat3",
-                                       "mood4", "anhe4", "guil4", "hope4", "apat4")], 
-                     function(x) length(unique(x)))
-print(thresholds)
-
-# define a simpler model to start with
-simple_model <- '
-dep1 =~ mood1 + anhe1 + guil1 + hope1 + apat1
-dep2 =~ mood2 + anhe2 + guil2 + hope2 + apat2
-dep3 =~ mood3 + anhe3 + guil3 + hope3 + apat3
-dep4 =~ mood4 + anhe4 + guil4 + hope4 + apat4
-'
-
-# fit the simpler model
-fit_simple <- cfa(simple_model, data = dass_complete,
-                  ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
-                              "mood2", "anhe2", "guil2", "hope2", "apat2",
-                              "mood3", "anhe3", "guil3", "hope3", "apat3",
-                              "mood4", "anhe4", "guil4", "hope4", "apat4"), 
-                  parameterization = "theta", estimator = "wlsmv",
-                  missing = "pairwise")
-
-# check convergence of the simpler model
-if (!lavInspect(fit_simple, "converged")) {
-  warning("Simple model did not converge. Consider checking data or further simplifying the model.")
-} else {
-  summary(fit_simple, fit.measures = TRUE, standardized = TRUE)
-}
