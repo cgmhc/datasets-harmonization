@@ -25,7 +25,7 @@ library(ggsci)
 
 # Elsa Brazil Cohort
 ## Prepare dataset
-```{r, echo=TRUE, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 #load
 elsabr <- read.csv("/Users/pedrozuccolo/Desktop/harmonization/data/elsabr_covid.csv") %>%
   select(-X)
@@ -67,45 +67,98 @@ plot_data <- merged_data %>%
     names_to = "assessment_type",
     values_to = "assessment"
   )
-
-
-str(plot_data)
 ```
 
 
 
 ## Visualize dates of assessment
-```{r}
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
 # Create the plot
 
-ggplot(plot_data, aes(x = month_year, y = assessment_type, fill = assessment_type)) +
-  geom_tile(aes(width = 10, height = 0.05), position = position_jitter(width = 0.8, height = 0.3), color = "grey", alpha = 0.8) +  
-  scale_y_discrete(labels = NULL) + 
-  scale_fill_manual(values = c("#fdd780", "#478ea6")) +  # Cores distintas para os grupos
-  scale_x_date(
-    limits = c(as.Date("2020-01-01"), as.Date("2021-10-01")),
-    breaks = seq(as.Date("2020-01-01"), as.Date("2021-10-01"), by = "1 month"),
-    date_labels = "%b %Y"  # Formato correto do rótulo do eixo X
-  ) + 
-  labs(title = "Timeline", x = "Date", y = "Assessment", fill = "Assessment Type") +
+#ggplot(plot_data, aes(x = month_year, y = assessment_type, fill = assessment_type)) +
+#  geom_tile(aes(width = 10, height = 0.05), position = position_jitter(width = 0.8, height = 0.3), color = "grey", alpha = 0.8) +  
+#  scale_y_discrete(labels = NULL) + 
+#  scale_fill_manual(values = c("#fdd780", "#478ea6")) +  # Cores distintas para os grupos
+#  scale_x_date(
+#    limits = c(as.Date("2020-01-01"), as.Date("2021-10-01")),
+#    breaks = seq(as.Date("2020-01-01"), as.Date("2021-10-01"), by = "1 month"),
+#    date_labels = "%b %Y"  # Formato correto do rótulo do eixo X
+#  ) + 
+#  labs(title = "Timeline", x = "Date", y = "Assessment", fill = "Assessment Type") +
+#  theme_minimal() +
+#  theme(
+#    panel.grid = element_line(color = "darkgrey", size = 0.1, linetype = 3),
+#    axis.line = element_line(color = "darkgrey", size = 0.3, linetype = 1),
+#    axis.text.x = element_text(angle = 45, vjust = 0.5, size = 8),  # Correção no tamanho do texto
+#    axis.text.y = element_text(size = 12),  
+#    axis.title.x = element_text(size = 12),  
+#    axis.title.y = element_text(size = 12),  
+#    legend.title = element_text(size = 12),  
+#    legend.text = element_text(size = 12),  
+#    plot.title = element_text(size = 14, hjust = 0.6)  
+#  ) +
+#  geom_vline(xintercept = as.Date("2020-03-01"), linetype = "dashed", size = 0.5, color = "black")
+
+#ggsave("/Users/pedrozuccolo/Desktop/harmonization/outputs/elsa_timeline.png", width = 10, height = 5, dpi = 300, bg = "white")
+```
+
+
+```{r}
+#create dataset based on assessment periods for ELSA Brazil and ELSA UK
+# ELSA UK wave 10, 01/2018 - 01/2019, COVID June & July 2020 (COVID wave 1) and November and December 2020 (COVID wave 2), wave 10 (01/2021 - 01/2023). OBS: Anxiety measures not available for ELSA UK in wave 2 COVID
+# ELSA Brasil COVID May to July 2020 (COVID-19 wave 1, T1), July to September 2020 (T2), October to December 2020 (T3), and April to June 2021 (T4)
+
+
+# create dataset
+data <- tibble(
+  cohort = c("ELSA UK", "ELSA UK", "ELSA UK", "ELSA UK", "ELSA UK", "ELSA UK", "ELSA UK", "ELSA UK",
+             "ELSA Brazil", "ELSA Brazil", "ELSA Brazil", "ELSA Brazil", "ELSA Brazil", "ELSA Brazil", "ELSA Brazil", "ELSA Brazil"),
+
+  start = as.Date(c("2018-01-01", "2018-01-01", "2020-06-01", NA, "2020-11-01", "2020-11-01", "2021-01-01", "2021-01-01",
+                    "2020-05-01", "2020-05-01", "2020-07-02", "2020-07-02", "2020-10-01", "2020-10-01", "2021-04-01", "2021-04-01")),
+
+  end = as.Date(c("2019-01-01", "2019-01-01", "2020-07-31", NA, "2020-12-31", "2020-12-31", "2023-01-01", "2023-01-01",
+                   "2020-07-01", "2020-07-01", "2020-09-01", "2020-09-01", "2020-12-31", "2020-12-31", "2021-06-30", "2021-06-30")),
+
+  measure = c("Depression", "Anxiety", "Depression", "Anxiety", "Depression", "Anxiety", "Depression", "Anxiety",
+              "Depression", "Anxiety", "Depression", "Anxiety", "Depression", "Anxiety", "Depression", "Anxiety"),
+
+  value = c(1, 1.1, 1, NA, 1, 1.1, 1, 1.1, 1.35, 1.45, 1.35, 1.45, 1.35, 1.45, 1.35, 1.45)
+
+  )
+  ```
+
+
+```{r}
+#plot
+ggplot(data, aes(xmin = start, xmax = end, ymin = value - 0.03, ymax = value + 0.03, fill = measure, color = cohort)) +
+  geom_rect(alpha = 0.8, color = "black") +
+  scale_fill_manual(values = c("Depression" = "#2a6ebb", "Anxiety" = "#f0ab00")) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +
   theme_minimal() +
-  theme(
-    panel.grid = element_line(color = "darkgrey", size = 0.1, linetype = 3),
-    axis.line = element_line(color = "darkgrey", size = 0.3, linetype = 1),
-    axis.text.x = element_text(angle = 45, vjust = 0.5, size = 8),  # Correção no tamanho do texto
-    axis.text.y = element_text(size = 12),  
-    axis.title.x = element_text(size = 12),  
-    axis.title.y = element_text(size = 12),  
-    legend.title = element_text(size = 12),  
-    legend.text = element_text(size = 12),  
-    plot.title = element_text(size = 14, hjust = 0.6)  
-  ) +
-  geom_vline(xintercept = as.Date("2020-03-01"), linetype = "dashed", size = 0.5, color = "black")
+  ylim(c(0.96, 1.8)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        legend.position = c(1, 1), # Legenda no canto superior direito
+        legend.justification = c(1, 1), # Ajusta a ancoragem da legenda
+        legend.background = element_rect(fill = "white", color = NA), # Fundo branco para a legenda
+        legend.box.background = element_rect(color = "black"), # Borda na legenda (opcional)
+        panel.grid = element_line(color = "darkgrey", size = 0.1, linetype = 3),
+        axis.line = element_line(color = "darkgrey", size = 0.3, linetype = 1),
+        axis.text.y = element_blank(), axis.ticks.y = element_blank(), 
+        axis.title.x = element_text(size = 18),  
+        axis.title.y = element_text(size = 18),  
+        legend.title = element_text(size = 16),  
+        legend.text = element_text(size = 12)) +
+  labs(x = "Period", y = "Assessment", fill = "", color = "Cohort") +
+  geom_vline(xintercept = as.Date("2020-03-01"), linetype = "dashed", size = 0.5, color = "black") +
+  annotate("text", x = as.Date("2018-07-01"), y = 1.55, label = "ELSA Brazil", size = 4, color = "black") +
+  annotate("text", x = as.Date("2018-07-01"), y = 1.2, label = "ELSA UK", size = 4, color = "black") +
+  annotate("text", x = as.Date("2020-06-01"), y = 1.7, label = "COVID-19", size = 3, color = "black")
+
 
 ggsave("/Users/pedrozuccolo/Desktop/harmonization/outputs/elsa_timeline.png", width = 10, height = 5, dpi = 300, bg = "white")
 
 
+vie(data)
+
 ```
-
-
-
