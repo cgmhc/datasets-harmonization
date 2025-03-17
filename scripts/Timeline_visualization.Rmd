@@ -149,16 +149,13 @@ ggplot(data, aes(xmin = start, xmax = end, ymin = value - 0.03, ymax = value + 0
         axis.title.y = element_text(size = 18),  
         legend.title = element_text(size = 16),  
         legend.text = element_text(size = 12)) +
-  labs(x = "Period", y = "Assessment", fill = "", color = "Cohort") +
+  labs(x = "Period", y = "", fill = "", color = "Cohort") +
   geom_vline(xintercept = as.Date("2020-03-01"), linetype = "dashed", size = 0.5, color = "black") +
-  annotate("text", x = as.Date("2018-07-01"), y = 1.55, label = "ELSA Brazil", size = 4, color = "black") +
-  annotate("text", x = as.Date("2018-07-01"), y = 1.2, label = "ELSA UK", size = 4, color = "black") +
-  annotate("text", x = as.Date("2020-06-01"), y = 1.7, label = "COVID-19", size = 3, color = "black")
+  annotate("text", x = as.Date("2017-11-1"), y = 1.40, label = "ELSA Brazil", size = 4, color = "black", angle = 90) +
+  annotate("text", x = as.Date("2017-11-1"), y = 1.05, label = "ELSA UK", size = 4, color = "black", angle = 90) +
+  annotate("text", x = as.Date("2020-06-30"), y = 1.8, label = "COVID-19", size = 4.5, color = "black")
 
 
 ggsave("/Users/pedrozuccolo/Desktop/harmonization/outputs/elsa_timeline.png", width = 10, height = 5, dpi = 300, bg = "white")
-
-
-vie(data)
 
 ```
