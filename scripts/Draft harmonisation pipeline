@@ -1,0 +1,149 @@
+# Set working directory
+setwd("insert file location here")
+
+# Load required packages
+library(tidyverse)
+library(lavaan)
+library(haven)
+library(foreign)
+library(mice)
+library(readr)
+library(lavaan)
+library(semTools)
+library(semPlot)
+library(mice)
+
+# Load the data
+elsabr_dep <- readRDS("elsabr_recoded_dep.rds")
+
+# Check the data structure
+str(elsauk_dep)
+
+# Change column names for ID to "id"
+colnames(elsauk_dep)[1] <- "id"
+
+# Change data structure for id to character (chr) instead of doubles (dbl)
+elsauk_dep$id <- as.character(elsauk_dep$id)
+
+# Check the data structure again
+str(elsauk_dep)
+
+### Measurement invariance testing between timepoints ###
+
+# Configural invariance model for depression
+dep_config_model <- '
+dep1 =~ mood1 + anhe1 + guil1 + hope1 + apat1
+dep2 =~ mood2 + anhe2 + guil2 + hope2 + apat2 
+dep3 =~ mood3 + anhe3 + guil3 + hope3 + apat3
+dep4 =~ mood4 + anhe4 + guil4 + hope4 + apat4
+
+dep1 ~~ dep1 + dep2 + dep3 + dep4
+dep2 ~~ dep2 + dep3 + dep4
+dep3 ~~ dep3 + dep4
+dep4 ~~ dep4
+
+mood1 ~~ mood2 + mood3 + mood4 
+mood2 ~~ mood3 + mood4
+mood3 ~~ mood4
+
+anhe1 ~~ anhe2 + anhe3 + anhe4
+anhe2 ~~ anhe3 + anhe4
+anhe3 ~~ anhe4
+
+guil1 ~~ guil2 + guil3 + guil4
+guil2 ~~ guil3 + guil4
+guil3 ~~ guil4
+
+hope1 ~~ hope2 + hope3 + hope4
+hope2 ~~ hope3 + hope4
+hope3 ~~ hope4
+
+apat1 ~~ apat2 + apat3 + apat4
+apat2 ~~ apat3 + apat4
+apat3 ~~ apat4
+'
+
+# Test model fit for the configural invariance model of depression
+fit_configural_dep <- cfa(dep_config_model, data = elsa_merge_dep,
+                          group = "wave", #group by wave (1=W1; 2=W2)
+                          ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                                      "mood2", "anhe2", "guil2", "hope2", "apat2",
+                                      "mood3", "anhe3", "guil3", "hope3", "apat3",
+                                      "mood4", "anhe4", "guil4", "hope4", "apat4"),
+                          parameterization = "theta", estimator = "WLSMV",
+                          missing = "pairwise")
+
+summary(fit_configural_dep, fit.measures = TRUE, standardized = TRUE)
+
+
+fitMeasures(fit_configural_dep, c("cfi", "tli", "rmsea", "srmr"))
+# Fit indice cut-offs are: 
+
+# Metric invariance model for depression
+dep_metric_model <- '
+  # Constraints factorial loadings to be equal across time points
+dep1 =~ V1Loading*mood1 + V2Loading*anhe1 + V3Loading*guil1 + V4Loading*hope1 + V5Loading*apat1
+
+dep2 =~ V1Loading*mood2 + V2Loading*anhe2 + V3Loading*guil2 + V4Loading*hope2 + V5Loading*apat2
+
+dep3 =~ V1Loading*mood3 + V2Loading*anhe3 + V3Loading*guil3 + V4Loading*hope3 + V5Loading*apat3
+
+dep4 =~ V1Loading*mood4 + V2Loading*anhe4 + V3Loading*guil4 + V4Loading*hope4 + V5Loading*apat4
+
+
+  # Allow covariance between latent factors throughtout time 
+  dep1 ~~ dep2 + dep3 + dep4
+  dep2 ~~ dep3 + dep4
+  dep3 ~~ dep4
+ 
+
+  # Allow covariance between errors of the same variables throughout time
+  mood1 ~~ mood2 + mood3 + mood4
+  anhe1 ~~ anhe2 + anhe3 + anhe4
+  guil1 ~~ guil2 + guil3 + guil4
+  hope1 ~~ hope2 + hope3 + hope4
+  apat1 ~~ apat2 + apat3 + apat4
+'
+
+fit_metric_dep <- cfa(dep_metric_model, data = elsa_merge_dep,
+                      group = "wave", #group by wave (1=W1; 2=W2)
+                      group.equal = "loadings",
+                      ordered = c("mood1", "anhe1", "guil1", "hope1", "apat1",
+                                  "mood2", "anhe2", "guil2", "hope2", "apat2",
+                                  "mood3", "anhe3", "guil3", "hope3", "apat3",
+                                  "mood4", "anhe4", "guil4", "hope4", "apat4"),
+                      parameterization = "theta", estimator = "WLSMV",
+                      missing = "pairwise")
+
+summary(fit_metric_dep, fit.measures = TRUE, standardized = TRUE)
+
+fitMeasures(fit_metric_dep, c("cfi", "tli", "rmsea", "srmr"))
+
+# Extract metric factor scores
+factor_scores_dep <- lavPredict(fit_metric_dep)
+head(factor_scores_dep)
+
+# Save the factor scores to a new data frame
+factor_scores_df_dep <- data.frame(id = elsa_merge_dep$id, factor_scores_dep)
+
+# Save the factor scores to a CSV file
+write.csv(factor_scores_df_dep, "factor_scores_dep.csv", row.names = FALSE)
+
+# Visualisation for the metric invariance model
+semPaths(fit_metric_dep, what = "std", 
+          edge.label.cex = 0.8, 
+          layout = "tree2", 
+          residuals = FALSE, 
+          sizeMan = 5, 
+          sizeLat = 10, 
+          sizeInt = 5,
+          edge.color = "black",
+          edge.width = 1,
+          node.color = "lightblue",
+          node.label.cex = 0.8,
+          label.scale = FALSE,
+          label.color = "black",
+          label.font = 2,
+          label.position = c(0.5, 0.5),
+          label.offset = c(0.1, 0.1),
+          label.angle = c(0, 0))
