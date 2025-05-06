@@ -11,7 +11,6 @@ library(readr)
 library(lavaan)
 library(semTools)
 library(semPlot)
-library(mice)
 
 # Load the data
 elsabr_dep <- readRDS("elsabr_recoded_dep.rds")
