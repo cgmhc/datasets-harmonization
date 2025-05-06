@@ -24,6 +24,35 @@ colnames(elsauk_dep)[1] <- "id"
 # Change data structure for id to character (chr) instead of doubles (dbl)
 elsauk_dep$id <- as.character(elsauk_dep$id)
 
+# Rename mental health variables
+dass <- dass_items %>%
+    rename(mood1 = dass13_rec_c1,
+           anhe1 = dass16_rec_c1,
+           guil1 = dass17_rec_c1,
+           hope1 = dass21_rec_c1,
+           apat1 = dass5_rec_c1,
+           mood2 = dass13_rec_c2,
+           anhe2 = dass16_rec_c2,
+           guil2 = dass17_rec_c2,
+           hope2 = dass21_rec_c2,
+           apat2 = dass5_rec_c2,
+           mood3 = dass13_rec_c3,
+           anhe3 = dass16_rec_c3,
+           guil3 = dass17_rec_c3,
+           hope3 = dass21_rec_c3,
+           apat3 = dass5_rec_c3, 
+           mood4 = dass13_rec_c4,
+           anhe4 = dass16_rec_c4,
+           guil4 = dass17_rec_c4,
+           hope4 = dass21_rec_c4,
+           apat4 = dass5_rec_c4)
+
+# Define the list of categorical (ordered) variables
+ordered_vars <- c("mood1", "anhe1", "guil1", "hope1", "apat1", "mood2", "anhe2", "guil2", "hope2", "apat2", "mood3", "anhe3", "guil3", "hope3", "apat3", "mood4", "anhe4", "guil4", "hope4", "apat4")
+
+# Convert variable data structure to ordered factors
+dass[ordered_vars] <- lapply(dass[ordered_vars], ordered)
+
 # Check the data structure again
 str(elsauk_dep)
 
@@ -77,6 +106,10 @@ summary(fit_configural_dep, fit.measures = TRUE, standardized = TRUE)
 
 fitMeasures(fit_configural_dep, c("cfi", "tli", "rmsea", "srmr"))
 # Fit indice cut-offs are: 
+* CFI/TLI >.90 (ideally >.95)
+* RMSEA <.08 (ideally <.06)
+* SRMR <.08
+* Chi-square p>.05 (doesn't matter if large sample size)
 
 # Metric invariance model for depression
 dep_metric_model <- '
